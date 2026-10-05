@@ -3,7 +3,7 @@ import { newMockEvent } from "matchstick-as/assembly/index"
 import { Log } from "../generated/DataEdge/EventfulDataEdge"
 import { ORACLE_ADDRESS, SECONDS_PER_DAY } from "../src/constants"
 
-// The test vector from docs/eligibility-metrics-publishing.md, produced by the oracle's encode_payload
+// The test vector from docs/wire-format.md, produced by the oracle's encode_payload
 export const TEST_VECTOR =
   "0x52450101f1a101d5a101f1a101bd018e010205018827d0860303f0a10102111111111111111111111111111111111111" +
   "1111f018c915066635c1020122222222222222222222222222222222222222221d000000021d0003f1a1010111111111" +
