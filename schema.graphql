@@ -1,8 +1,136 @@
-type ExampleEntity @entity(immutable: true) {
+# Days are stored two ways: as an Int counting days since 1970-01-01 (UTC), as on the wire, and as an
+# ISO "YYYY-MM-DD" string. Day, Run and IndexerDay ids use the ISO form.
+#
+# Counters are BigInt because the wire format allows any u64.
+
+"""
+The oracle's latest view, taken from the run with the highest run day seen so far. Singleton, id "current".
+"""
+type OracleState @entity(immutable: false) {
+  id: String!
+  latestRun: Run!
+  "First day of the latest run's analysis window (inclusive)"
+  windowStartDay: Int!
+  "Last day of the latest run's analysis window (inclusive)"
+  windowEndDay: Int!
+  "Thresholds of the latest run, which the Indexer rolling aggregates are computed against"
+  criteria: Criteria!
+  "Every indexer that has appeared in any payload"
+  indexers: [Indexer!]!
+  payloadCount: Int!
+  lastPayload: Payload!
+}
+
+"""
+One accepted Log(bytes) event: a decoded payload from the oracle's signing address.
+"""
+type Payload @entity(immutable: true) {
+  "Transaction hash ++ log index"
   id: Bytes!
-  account: Bytes!
-  value: BigInt!
+  run: Run!
+  "Days this payload carried, oldest first"
+  days: [Day!]!
+  transactionHash: Bytes!
   blockNumber: BigInt!
   blockTimestamp: BigInt!
+}
+
+"""
+One oracle run, keyed by run date. The same run can be published more than once; the latest payload
+in block order wins.
+"""
+type Run @entity(immutable: false) {
+  "Run date, YYYY-MM-DD"
+  id: String!
+  runDay: Int!
+  date: String!
+  windowStartDay: Int!
+  windowEndDay: Int!
+  "Indexers with at least one query attempt in the window"
+  indexersEvaluated: BigInt!
+  "Indexers the run found eligible, whether or not every renewal batch succeeded"
+  indexersEligible: BigInt!
+  criteria: Criteria!
+  "Days carried by the latest payload for this run"
+  days: [Day!]!
+  latestPayload: Payload!
   transactionHash: Bytes!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  payloadCount: Int!
+  payloads: [Payload!]! @derivedFrom(field: "run")
+}
+
+"""
+A set of eligibility thresholds, keyed by value: "minOnlineDays-minSubgraphs-maxLatencyMs-maxBlocksBehind".
+"""
+type Criteria @entity(immutable: false) {
+  id: String!
+  minOnlineDays: BigInt!
+  minSubgraphs: BigInt!
+  maxLatencyMs: BigInt!
+  maxBlocksBehind: BigInt!
+  firstRun: Run!
+  lastRun: Run!
+}
+
+"""
+A published day. Each publish is a full snapshot of the day, replacing the previous one.
+"""
+type Day @entity(immutable: false) {
+  "YYYY-MM-DD"
+  id: String!
+  dayNumber: Int!
+  date: String!
+  "Indexers with query attempts on this day, as of the latest snapshot"
+  indexers: [Indexer!]!
+  indexerCount: Int!
+  "False when the day was published on that same UTC day, so it held only part of the day's data"
+  isFinal: Boolean!
+  "Thresholds the day was published under"
+  criteria: Criteria!
+  payload: Payload!
+  "Includes rows zeroed because the indexer was missing from a later snapshot"
+  indexerDays: [IndexerDay!]! @derivedFrom(field: "day")
+}
+
+"""
+One indexer's metrics for one day. An indexer missing from a published day was routed nothing that
+day; a row it had from an earlier snapshot is kept with every counter set to zero.
+"""
+type IndexerDay @entity(immutable: false) {
+  "Indexer address (hex) - YYYY-MM-DD"
+  id: String!
+  indexer: Indexer!
+  day: Day!
+  dayNumber: Int!
+  date: String!
+  queryAttempts: BigInt!
+  "Attempts meeting the status, latency and blocks-behind bars at once"
+  qualifyingQueries: BigInt!
+  "Distinct deployments with at least one qualifying query"
+  qualifyingSubgraphs: BigInt!
+  "The failed_* counts overlap and need not add up to the non-qualifying attempts"
+  failedStatus: BigInt!
+  failedLatency: BigInt!
+  failedBlocksBehind: BigInt!
+  "As published, under `criteria`. Recompute from the counters to apply other thresholds"
+  isOnlineDay: Boolean!
+  "Thresholds this row was published under"
+  criteria: Criteria!
+  isFinal: Boolean!
+  payload: Payload!
+}
+
+type Indexer @entity(immutable: false) {
+  "Indexer address"
+  id: Bytes!
+  "Days in the latest window with qualifyingQueries >= 1 and qualifyingSubgraphs >= the latest MIN_SUBGRAPHS"
+  onlineDays: Int!
+  "Days in the latest window with at least one query attempt"
+  daysWithAttempts: Int!
+  "Latest day in the latest window with at least one query attempt"
+  lastDayWithAttempts: Day
+  firstSeenDay: Day!
+  days: [IndexerDay!]! @derivedFrom(field: "indexer")
 }

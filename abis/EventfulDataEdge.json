@@ -1,0 +1,12 @@
+[
+  {
+    "type": "event",
+    "name": "Log",
+    "anonymous": false,
+    "inputs": [{ "name": "data", "type": "bytes", "indexed": false }]
+  },
+  {
+    "type": "fallback",
+    "stateMutability": "nonpayable"
+  }
+]
