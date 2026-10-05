@@ -1,0 +1,16 @@
+# Graph CLI generated artifacts
+build/
+generated/
+
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+
+# Env
+.env
+
+# Matchstick
+tests/.bin/
+tests/.latest.json
